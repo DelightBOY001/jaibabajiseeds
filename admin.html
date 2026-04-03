@@ -323,10 +323,15 @@ body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);min
 <div class="toast" id="toast"></div>
 
 <!-- Supabase SDK -->
-<script src="jbs-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <script>
+// ════════════════════════════════════════════
+//  SUPABASE CREDENTIALS — hardcoded, always works on every device
+// ════════════════════════════════════════════
+var SUPA_URL = 'https://djwdlmjlcknnxojbjvad.supabase.co';
+var SUPA_KEY = 'sb_publishable_8P6-VmsQ-5h1ht9QlL_FNQ_XWQ9vwjI';
+
 // ════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════
@@ -334,13 +339,8 @@ var DB = null;
 var VARIETIES = [];
 var SETTINGS  = {};
 
-// Keys: jbs-config.js se lo, warna localStorage fallback
-var savedUrl = (typeof JBS_CONFIG !== 'undefined' && !JBS_CONFIG.supabase_url.includes('APNI_SUPABASE'))
-  ? JBS_CONFIG.supabase_url
-  : (localStorage.getItem('jbs_url') || '');
-var savedKey = (typeof JBS_CONFIG !== 'undefined' && !JBS_CONFIG.supabase_key.includes('APNI_SUPABASE'))
-  ? JBS_CONFIG.supabase_key
-  : (localStorage.getItem('jbs_key') || '');
+var savedUrl = SUPA_URL;
+var savedKey = SUPA_KEY;
 
 // ════════════════════════════════════════════
 //  NAVIGATION
@@ -404,8 +404,6 @@ function doConnect() {
       btn.disabled = false;
       DB = null;
     } else {
-      localStorage.setItem('jbs_url', url);
-      localStorage.setItem('jbs_key', key);
       savedUrl = url;
       savedKey = key;
       setConnected(true);
@@ -768,36 +766,35 @@ function showToast(msg) {
 //  STARTUP — runs after page fully loads
 // ════════════════════════════════════════════
 window.onload = function() {
-  if (savedUrl && savedKey) {
-    // Pre-fill setup inputs
-    document.getElementById('inp-url').value = savedUrl;
-    document.getElementById('inp-key').value = savedKey;
+  // Pre-fill setup inputs (visible if user navigates to Setup page)
+  var urlInp = document.getElementById('inp-url');
+  var keyInp = document.getElementById('inp-key');
+  if (urlInp) urlInp.value = savedUrl;
+  if (keyInp) keyInp.value = savedKey;
 
-    // Try to connect
-    try {
-      DB = supabase.createClient(savedUrl, savedKey);
-    } catch(e) {
-      gotoPage('setup');
-      return;
-    }
-
-    // Test connection and go to dashboard if OK
-    DB.from('varieties').select('id').limit(1).then(function(res) {
-      if (res.error) {
-        setConnected(false);
-        gotoPage('setup');
-        showToast('Connection failed — please re-enter your keys');
-      } else {
-        setConnected(true);
-        loadAll();
-        gotoPage('dashboard');
-      }
-    });
-
-  } else {
-    // No keys saved — show setup page
+  // Always auto-connect using hardcoded credentials
+  try {
+    DB = supabase.createClient(savedUrl, savedKey);
+  } catch(e) {
+    showToast('Supabase SDK error — check console');
+    console.error(e);
     gotoPage('setup');
+    return;
   }
+
+  // Test connection
+  DB.from('varieties').select('id').limit(1).then(function(res) {
+    if (res.error) {
+      setConnected(false);
+      showToast('Database connection failed — check credentials');
+      console.error(res.error);
+      gotoPage('setup');
+    } else {
+      setConnected(true);
+      loadAll();
+      gotoPage('dashboard');
+    }
+  });
 };
 </script>
 </body>
