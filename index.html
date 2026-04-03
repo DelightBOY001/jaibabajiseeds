@@ -757,29 +757,46 @@ function addToInquiry(btn, name) {
   setTimeout(() => { btn.textContent = '+ Inquire'; btn.classList.remove('added'); }, 2000);
 }
 
-// INQUIRY FORM SUBMIT — sends to Admin Panel via localStorage
-function submitForm(btn) {
+// INQUIRY FORM SUBMIT — saves directly to Supabase
+async function submitForm(btn) {
   const form = document.querySelector('#b2b');
   const inputs = form ? form.querySelectorAll('input, select, textarea') : [];
   const vals = Array.from(inputs).map(el => el.value.trim());
   const inquiry = {
-    name: vals[0] || '',
+    name:    vals[0] || '',
     company: vals[1] || '',
     variety: form ? (form.querySelector('select') ? form.querySelector('select').value : '') : '',
-    qty: vals[3] || '',
-    phone: vals[4] || '',
+    qty:     vals[3] || '',
+    phone:   vals[4] || '',
     message: vals[5] || '',
-    date: new Date().toLocaleDateString('en-IN'),
-    id: Date.now()
+    status:  'new'
   };
+
+  if (!inquiry.name || !inquiry.phone) {
+    alert('Please fill in your Name and Phone number');
+    return;
+  }
+
   btn.textContent = 'Sending...';
   btn.disabled = true;
-  setTimeout(() => {
-    try { localStorage.setItem('jbs_new_inquiry', JSON.stringify(inquiry)); } catch(e) {}
+
+  try {
+    const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    const { error } = await supa.from('inquiries').insert([inquiry]);
+    if (error) throw error;
     btn.textContent = '✓ Inquiry Sent!';
     btn.style.background = '#2C5F2E';
-    setTimeout(() => { btn.textContent = 'Send Inquiry →'; btn.style.background = ''; btn.disabled = false; }, 3000);
-  }, 1000);
+  } catch(e) {
+    console.error('Inquiry error:', e);
+    btn.textContent = '✓ Received!';
+    btn.style.background = '#2C5F2E';
+  }
+
+  setTimeout(() => {
+    btn.textContent = 'Send Inquiry →';
+    btn.style.background = '';
+    btn.disabled = false;
+  }, 3000);
 }
 
 // TESTIMONIALS
@@ -815,87 +832,20 @@ function toggleMenu() {
   }
 }
 
-// ── BACKEND DATA LOADER — loads images & data saved from Admin Panel ──
-const STORE_KEY = 'jbs_admin_data';
 
-function loadFromBackend() {
-  try {
-    const d = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (!d) return;
-    const vars = d.varieties || [];
-    const settings = d.settings || {};
-
-    // Update each variety card
-    document.querySelectorAll('.rice-card').forEach((card, i) => {
-      const v = vars[i];
-      if (!v) return;
-
-      // Image
-      const photo = card.querySelector('.rice-photo');
-      const imgSvg = card.querySelector('.card-img-svg');
-      if (photo && v.imgData) {
-        photo.src = v.imgData;
-        photo.style.display = 'block';
-        if (imgSvg) imgSvg.style.opacity = '0';
-      }
-
-      // Text
-      const nameEl = card.querySelector('.card-name');
-      const descEl = card.querySelector('.card-desc');
-      const priceEl = card.querySelector('.card-price');
-      if (nameEl && v.name) nameEl.textContent = v.name;
-      if (descEl && v.desc) descEl.textContent = v.desc;
-      if (priceEl && v.price) priceEl.innerHTML = '&#8377;' + v.price + ' <span>/ kg</span>';
-
-      // Ratings
-      card.querySelectorAll('.rating-row').forEach((row, ri) => {
-        const label = row.querySelector('.rating-label');
-        const fill = row.querySelector('.rating-fill');
-        if (label && v.ratingLabels && v.ratingLabels[ri]) label.textContent = v.ratingLabels[ri];
-        if (fill && v.ratingVals && v.ratingVals[ri] !== undefined) fill.style.width = v.ratingVals[ri] + '%';
-      });
-
-      // Meta
-      const metaItems = card.querySelectorAll('.card-meta-item');
-      if (metaItems[0] && v.cookTime) metaItems[0].lastChild.textContent = ' ' + v.cookTime;
-      if (metaItems[1] && v.bestFor) metaItems[1].textContent = v.bestFor;
-
-      // Visibility
-      if (v.active === false) card.style.display = 'none';
-    });
-
-    // Contact info
-    if (settings.phone) {
-      const clean = settings.phone.replace(/\s/g, '');
-      document.querySelectorAll('a[href^="tel:"]').forEach(a => { a.href = 'tel:' + clean; a.textContent = settings.phone; });
-      document.querySelectorAll('a[href^="https://wa.me/"]').forEach(a => { a.href = 'https://wa.me/' + clean.replace(/[^0-9]/g,''); });
-    }
-    if (settings.email) {
-      document.querySelectorAll('a[href^="mailto:"]').forEach(a => { a.href = 'mailto:' + settings.email; a.textContent = settings.email; });
-    }
-
-    // Section visibility
-    if (settings.showCompare === false) { const el = document.getElementById('compare'); if (el) el.style.display = 'none'; }
-    if (settings.showTest === false) { const el = document.getElementById('testimonials'); if (el) el.style.display = 'none'; }
-    if (settings.showWA === false) { const el = document.querySelector('.wa-btn'); if (el) el.style.display = 'none'; }
-
-  } catch(e) { /* silent fail */ }
-}
-
-window.addEventListener('load', () => { setTimeout(loadFromBackend, 200); });
+window.addEventListener('load', () => { setTimeout(() => {}, 200); });
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
-//  SUPABASE CONFIG — keys hardcoded hain
-//  Admin panel mein jo bhi change karo, sabhi devices pe dikhe
+//  SUPABASE CONFIG — credentials hardcoded, works on every device
 // ═══════════════════════════════════════════════════════════════════
 const SUPA_URL = 'https://djwdlmjlcknnxojbjvad.supabase.co';
 const SUPA_KEY = 'sb_publishable_8P6-VmsQ-5h1ht9QlL_FNQ_XWQ9vwjI';
 
 // ═══════════════════════════════════════════════════════════════════
-//  LIVE DATA LOADER — har device pe Supabase se seedha data aata hai
+//  LIVE DATA LOADER — fetches data from Supabase on every device
 // ═══════════════════════════════════════════════════════════════════
 (async function loadLiveData() {
   let supa;
@@ -980,48 +930,6 @@ const SUPA_KEY = 'sb_publishable_8P6-VmsQ-5h1ht9QlL_FNQ_XWQ9vwjI';
     if (s.show_whatsapp     === false) { const el = document.querySelector('.wa-btn');       if(el) el.style.display = 'none'; }
   }
 })();
-
-// ═══════════════════════════════════════════════════════════════════
-//  INQUIRY FORM — directly Supabase mein save hota hai
-// ═══════════════════════════════════════════════════════════════════
-async function submitInquiry(btn) {
-  const inputs = document.querySelectorAll('#b2b input, #b2b select, #b2b textarea');
-  const inquiry = {
-    name:    inputs[0] ? inputs[0].value.trim() : '',
-    company: inputs[1] ? inputs[1].value.trim() : '',
-    variety: document.querySelector('#b2b select') ? document.querySelector('#b2b select').value : '',
-    qty:     inputs[3] ? inputs[3].value.trim() : '',
-    phone:   inputs[4] ? inputs[4].value.trim() : '',
-    message: document.querySelector('#b2b textarea') ? document.querySelector('#b2b textarea').value.trim() : '',
-    status:  'new'
-  };
-
-  if (!inquiry.name || !inquiry.phone) {
-    alert('Naam aur Phone number zaroor bharein');
-    return;
-  }
-
-  btn.textContent = 'Sending...';
-  btn.disabled = true;
-
-  try {
-    const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-    const { error } = await supa.from('inquiries').insert([inquiry]);
-    if (error) throw error;
-    btn.textContent = '✓ Inquiry Sent!';
-    btn.style.background = '#2C5F2E';
-  } catch(e) {
-    console.error('Inquiry error:', e);
-    btn.textContent = '✓ Received!';
-    btn.style.background = '#2C5F2E';
-  }
-
-  setTimeout(() => {
-    btn.textContent = 'Send Inquiry →';
-    btn.style.background = '';
-    btn.disabled = false;
-  }, 3000);
-}
 </script>
 
 </body>
